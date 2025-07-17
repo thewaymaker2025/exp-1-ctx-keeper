@@ -3,7 +3,7 @@ import type { PlasmoCSConfig } from "plasmo"
 import {
   extractPreloadedConversations,
   getConversationMetadata
-} from "~helpers/ai-page-extractors/chatgpt-extractor"
+} from "~helpers/page-extractors/chatgpt"
 
 export const config: PlasmoCSConfig = {
   matches: ["https://chatgpt.com/*/*"],

@@ -3,17 +3,17 @@ import { generate } from "short-uuid"
 
 import { Storage } from "@plasmohq/storage"
 
+import { sendSmartSync } from "~helpers/api"
+import { conversationsWithHashes } from "~helpers/conversations"
 import {
   extractPreloadedConversations,
   getConversationMetadata
-} from "~helpers/ai-page-extractors/chatgpt-extractor"
-import { sendSmartSync } from "~helpers/api-requests"
-import { conversationsWithHashes } from "~helpers/conversations"
+} from "~helpers/page-extractors/chatgpt"
 
 const storage = new Storage()
 
 export const config: PlasmoCSConfig = {
-  matches: ["https://chatgpt.com/c/*"],
+  matches: ["https://chatgpt.com/c/*", "https://chatgpt.com/g/*"],
   all_frames: true
 }
 
@@ -35,20 +35,37 @@ async function getOrCreateUserId(): Promise<string> {
   return newUserId
 }
 
-// Extract session ID from URL
 function getSessionId(): string | null {
-  const match = location.href.match(
+  // Handle regular chat URLs: /c/uuid
+  const chatMatch = location.href.match(
     /\/c\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
   )
-  return match ? match[1] : null
+  if (chatMatch) {
+    return chatMatch[1]
+  }
+
+  // Handle GPT URLs: /g/g-xxxxx-xxxx
+  const gptMatch = location.href.match(/\/g\/(g-.+?)(?:\/|$)/)
+  if (gptMatch) {
+    return gptMatch[1]
+  }
+
+  return null
 }
 
-// Check if current URL contains a valid UUID as the last parameter
 function isValidChatSessionUrl(): boolean {
   const url = location.href
-  const uuidRegex =
+
+  // Check for regular chat session with UUID
+  const chatRegex =
     /\/c\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  return uuidRegex.test(url)
+  if (chatRegex.test(url)) return true
+
+  // Check for GPT session
+  const gptRegex = /\/g\/g-.+/i
+  if (gptRegex.test(url)) return true
+
+  return false
 }
 
 async function extractAndLogConversation() {
@@ -72,19 +89,6 @@ async function extractAndLogConversation() {
         "⏭️ Skipping conversation extraction - not a valid chat session URL with UUID:",
         location.href
       )
-
-      //   // Send basic data to popup even without conversations
-      //   chrome.runtime
-      //     .sendMessage({
-      //       type: "CONVERSATIONS_WITH_HASHES",
-      //       data: null,
-      //       url: location.href,
-      //       userId: userId,
-      //       sessionId: sessionId
-      //     })
-      //     .catch(() => {
-      //       // Popup might not be open, that's fine
-      //     })
 
       return []
     }
