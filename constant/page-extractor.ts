@@ -21,5 +21,6 @@ export const CHATGPT_PAGE_SELECTOR_PATH = {
     content_selector: ``,
     // Action buttons within assistant message containers
     action_buttons: `article[data-testid*="conversation-turn"] .agent-turn .mx-\\[var\\(--mini-thread-content-inset\\)\\]`
-  }
+  },
+  prompt_text_selector: `#prompt-textarea`
 }

@@ -1,10 +1,14 @@
+import axios from "axios"
 import { useEffect, useState } from "react"
 
 import { Storage } from "@plasmohq/storage"
 
-import { useSegments } from "~hooks/useSegments"
+import { CHATGPT_PAGE_SELECTOR_PATH } from "~constant/page-extractor"
 
 import "./style.css"
+
+import { useSegments } from "~hooks/useSegments"
+import { extractAxiosResponseData, formatRawString } from "~utils"
 
 const storage = new Storage()
 
@@ -13,6 +17,10 @@ function IndexPopup() {
   const [selectedContextId, setSelectedContextId] = useState<string | null>(
     null
   )
+  // Selection state: { [segmentId]: Set<threadId> | 'ALL' }
+  const [selected, setSelected] = useState<{
+    [segmentId: string]: Set<string> | "ALL"
+  }>({})
   const [userId, setUserId] = useState("")
   const [sessionId, setSessionId] = useState("")
   const [receivedData, setReceivedData] = useState(null)
@@ -21,8 +29,125 @@ function IndexPopup() {
   // Use the custom hook to fetch segments
   const { segments, loading, error, metadata, refetch } = useSegments(sessionId)
 
+  // Expand/collapse segment
   const toggleContext = (id: string) => {
     setSelectedContextId((prev) => (prev === id ? null : id))
+  }
+
+  // Select/unselect a segment (all threads)
+  const toggleSegment = (segment) => {
+    setSelected((prev) => {
+      const isAll = prev[segment.id] === "ALL"
+      if (isAll) {
+        // Unselect segment
+        const { [segment.id]: _, ...rest } = prev
+        return rest
+      } else {
+        // Select all threads
+        return { ...prev, [segment.id]: "ALL" }
+      }
+    })
+  }
+
+  // Select/unselect a thread within a segment
+  const toggleThread = (segment, threadId) => {
+    setSelected((prev) => {
+      const current = prev[segment.id]
+      if (current === "ALL") {
+        // Deselect this thread, select all others
+        const threadSet = new Set(segment.threads.map((t) => t.id))
+        threadSet.delete(threadId)
+        if (threadSet.size === 0) {
+          // Unselect segment if no threads left
+          const { [segment.id]: _, ...rest } = prev
+          return rest
+        }
+        return { ...prev, [segment.id]: threadSet }
+      } else if (current instanceof Set && current.has(threadId)) {
+        // Deselect this thread
+        const newSet = new Set(current)
+        newSet.delete(threadId)
+        if (newSet.size === 0) {
+          // Unselect segment if no threads left
+          const { [segment.id]: _, ...rest } = prev
+          return rest
+        }
+        return { ...prev, [segment.id]: newSet }
+      } else {
+        // Select this thread
+        const newSet = current instanceof Set ? new Set(current) : new Set()
+        newSet.add(threadId)
+        // If all threads are selected, mark as ALL
+        if (newSet.size === segment.threads.length) {
+          return { ...prev, [segment.id]: "ALL" }
+        }
+        return { ...prev, [segment.id]: newSet }
+      }
+    })
+  }
+
+  // Helper: is a thread selected?
+  const isThreadSelected = (segment, threadId) => {
+    const sel = selected[segment.id]
+    if (sel === "ALL") return true
+    if (sel instanceof Set) return sel.has(threadId)
+    return false
+  }
+
+  // Helper: is a segment selected?
+  const isSegmentSelected = (segment) => {
+    return !!selected[segment.id]
+  }
+
+  // Prepare payload for API
+  const getSelectionsPayload = () => {
+    return Object.entries(selected)
+      .map(([segmentId, value]) => {
+        if (value === "ALL") {
+          return { segment_id: segmentId }
+        } else if (value instanceof Set) {
+          return { segment_id: segmentId, thread_ids: Array.from(value) }
+        }
+        return null
+      })
+      .filter(Boolean)
+  }
+
+  // Is inject button enabled?
+  const isInjectEnabled = Object.keys(selected).length > 0
+
+  // Inject API call
+  const handleInject = async () => {
+    if (!sessionId) return
+    const selections = getSelectionsPayload()
+    try {
+      const res = await axios.post(
+        `http://localhost:4350/api/context/inject/${sessionId}`,
+        { selections },
+        { headers: { "Content-Type": "application/json" } }
+      )
+      const data = extractAxiosResponseData(res.data, "success")
+        ?.data as unknown as {
+        prompt: string
+        estimated_token_count: number
+      }
+      console.log("Inject response:", data)
+
+      // Inject prompt into prompt textarea in content script
+      if (data) {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]?.id) {
+            chrome.tabs.sendMessage(tabs[0].id, {
+              type: "CTX_KEEPER_INJECT_PROMPT",
+              prompt: formatRawString(data.prompt),
+              selector: CHATGPT_PAGE_SELECTOR_PATH.prompt_text_selector
+            })
+          }
+        })
+      }
+    } catch (err) {
+      console.error("Inject error:", err)
+    }
   }
 
   // Load data from Plasmo storage
@@ -82,8 +207,6 @@ function IndexPopup() {
       }
     }
   }, [])
-
-  console.log(window.location.href)
 
   return (
     <div className="min-w-[500px] h-[140rem] flex flex-col bg-white relative">
@@ -146,6 +269,11 @@ function IndexPopup() {
                     <input
                       type="checkbox"
                       className="w-4 h-4"
+                      checked={isSegmentSelected(segment)}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        toggleSegment(segment)
+                      }}
                       onClick={(e) => e.stopPropagation()}
                     />
                     <span className="text-sm">
@@ -172,7 +300,16 @@ function IndexPopup() {
                     <div
                       key={thread.id}
                       className="flex items-start gap-2 p-3 pl-8 border-l-2 border-gray-300 ml-4">
-                      <input type="checkbox" className="w-4 h-4 mt-0.5" />
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 mt-0.5"
+                        checked={isThreadSelected(segment, thread.id)}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          toggleThread(segment, thread.id)
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
                       <div className="flex-1">
                         <div className="text-sm font-medium text-black">
                           {thread.name}
@@ -189,13 +326,32 @@ function IndexPopup() {
           ))}
         </div>
 
-        {/* Inject button */}
-        {/* BUTTON NOT NEEDED YET, DO NOT MODIFY THIS */}
-        {/* <div className="mt-6">
-          <button className="w-full bg-gray-200 text-gray-600 py-3 hover:bg-gray-300">
-            Inject into conversation
+        {/* Floating Inject Button */}
+        <div
+          style={{
+            position: "fixed",
+            left: 0,
+            right: 0,
+            bottom: 24,
+            display: "flex",
+            justifyContent: "center",
+            pointerEvents: "none"
+          }}>
+          <button
+            className="bg-black text-white px-8 py-3 text-lg font-semibold shadow-md cursor-pointer disabled:grayscale-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              borderRadius: 0,
+              pointerEvents: "auto",
+              color: "#fff",
+              border: "3px solid #fff",
+              outline: "2px solid #000",
+              outlineOffset: "2px"
+            }}
+            disabled={!isInjectEnabled}
+            onClick={handleInject}>
+            Inject Selected Context
           </button>
-        </div> */}
+        </div>
       </div>
     </div>
   )

@@ -9,6 +9,7 @@ import {
   extractPreloadedConversations,
   getConversationMetadata
 } from "~helpers/page-extractors/chatgpt"
+import { formatRawString } from "~utils"
 
 const storage = new Storage()
 
@@ -19,6 +20,32 @@ export const config: PlasmoCSConfig = {
 
 let currentUrl = location.href
 let extractionTimeout: NodeJS.Timeout | null = null
+
+// Listen for prompt injection from popup
+if (typeof chrome !== "undefined") {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (
+      message.type === "CTX_KEEPER_INJECT_PROMPT" &&
+      typeof message.prompt === "string"
+    ) {
+      try {
+        const textarea = document.querySelector(message.selector)
+
+        console.log({ textarea })
+        if (textarea) {
+          const formatted = formatRawString(message.prompt)
+          textarea.value = formatted
+
+          console.log("CTX_KEEPER: Injected prompt:", formatted)
+          // Dispatch input event to notify React/Vue/other frameworks
+          textarea.dispatchEvent(new Event("input", { bubbles: true }))
+        }
+      } catch (e) {
+        console.error("CTX_KEEPER: Failed to inject prompt", e)
+      }
+    }
+  })
+}
 
 // Generate or retrieve user ID
 async function getOrCreateUserId(): Promise<string> {
