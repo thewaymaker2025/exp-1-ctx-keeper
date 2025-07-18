@@ -9,7 +9,7 @@ import {
   extractPreloadedConversations,
   getConversationMetadata
 } from "~helpers/page-extractors/chatgpt"
-import { formatRawString } from "~utils"
+import { copyAndPaste, formatRawString } from "~utils"
 
 const storage = new Storage()
 
@@ -23,27 +23,38 @@ let extractionTimeout: NodeJS.Timeout | null = null
 
 // Listen for prompt injection from popup
 if (typeof chrome !== "undefined") {
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (
-      message.type === "CTX_KEEPER_INJECT_PROMPT" &&
-      typeof message.prompt === "string"
-    ) {
-      try {
-        const textarea = document.querySelector(message.selector)
+  chrome.runtime.onMessage.addListener(
+    async (message, sender, sendResponse) => {
+      if (
+        message.type === "CTX_KEEPER_INJECT_PROMPT" &&
+        typeof message.prompt === "string"
+      ) {
+        try {
+          const textarea = document.querySelector(message.selector)
+          if (textarea) {
+            const formatted = formatRawString(message.prompt)
+            textarea.focus()
+            textarea.value = ""
 
-        console.log({ textarea })
-        if (textarea) {
-          const formatted = formatRawString(message.prompt)
-          textarea.value = formatted
+            closePopup()
 
-          console.log("CTX_KEEPER: Injected prompt:", formatted)
-          // Dispatch input event to notify React/Vue/other frameworks
-          textarea.dispatchEvent(new Event("input", { bubbles: true }))
+            setTimeout(async () => {
+              await copyAndPaste(formatted, textarea as HTMLElement)
+            }, 500)
+
+            // console.log("CTX_KEEPER: Injected prompt:", formatted)
+          }
+        } catch (e) {
+          console.error("CTX_KEEPER: Failed to inject prompt", e)
         }
-      } catch (e) {
-        console.error("CTX_KEEPER: Failed to inject prompt", e)
       }
     }
+  )
+}
+
+function closePopup() {
+  chrome.runtime.sendMessage({ type: "closePopup" }, (response) => {
+    console.log("Popup close request sent")
   })
 }
 

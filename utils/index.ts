@@ -27,3 +27,38 @@ export function formatRawString(str: string) {
     return str
   }
 }
+
+export async function copyAndPaste(
+  textToCopy: string,
+  targetElement: HTMLElement
+) {
+  try {
+    // Copy to clipboard
+    await navigator.clipboard.writeText(textToCopy)
+
+    // Immediately paste to target element
+    if (
+      targetElement.tagName === "INPUT" ||
+      targetElement.tagName === "TEXTAREA"
+    ) {
+      targetElement.value = textToCopy
+      targetElement.focus()
+    } else {
+      targetElement.innerHTML = textToCopy
+    }
+
+    const inputEvent = new InputEvent("input", {
+      bubbles: true,
+      cancelable: true,
+      inputType: "insertText",
+      data: textToCopy
+    })
+    targetElement.dispatchEvent(inputEvent)
+
+    // Trigger events to simulate real paste
+    targetElement.dispatchEvent(new Event("paste", { bubbles: true }))
+    targetElement.dispatchEvent(new Event("input", { bubbles: true }))
+  } catch (error) {
+    console.error("Copy/paste failed:", error)
+  }
+}

@@ -198,6 +198,11 @@ function IndexPopup() {
           setSessionId(message.sessionId)
           console.log("Received real-time data:", message)
         }
+
+        if (message.type === "closePopup") {
+          window.close()
+          console.log("Popup close request received")
+        }
       }
 
       chrome.runtime.onMessage.addListener(messageListener)
