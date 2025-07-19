@@ -261,7 +261,7 @@ function IndexPopup() {
             </div>
           )}
 
-          {segments.map((segment) => (
+          {segments?.map((segment) => (
             <div key={segment.id} className="border border-gray-200 mb-2">
               <div
                 className="p-3 cursor-pointer hover:bg-gray-50"
@@ -298,7 +298,7 @@ function IndexPopup() {
 
               {selectedContextId === segment.id && (
                 <div className="border-t border-gray-200 bg-gray-50">
-                  {segment.threads.map((thread) => (
+                  {segment?.threads?.map((thread) => (
                     <div
                       key={thread.id}
                       className="flex items-start gap-2 p-3 pl-8 border-l-2 border-gray-300 ml-4">

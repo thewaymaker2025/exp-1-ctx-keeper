@@ -64,6 +64,8 @@ export async function injectContext(
 }
 
 export async function getContextSegments(sessionId: string) {
-  const res = await $axios.get(`/context/segments/${sessionId}`)
+  const res = await $axios.get(
+    `/context/segments/${sessionId}?include_threads=true`
+  )
   return res.data
 }
