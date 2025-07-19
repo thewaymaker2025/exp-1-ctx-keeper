@@ -12,7 +12,7 @@ export function conversationsWithHashes(
   }))
 }
 
-const MAX_BYTES_PER_BATCH = 80 * 1024 // 300KB
+const MAX_BYTES_PER_BATCH = 80 * 1024 // 80KB
 
 function getByteLength(pair: { user: string; assistant: string }): number {
   const encoder = new TextEncoder()
