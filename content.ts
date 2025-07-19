@@ -4,7 +4,10 @@ import { generate } from "short-uuid"
 import { Storage } from "@plasmohq/storage"
 
 import { sendSmartSync } from "~helpers/api"
-import { conversationsWithHashes } from "~helpers/conversations"
+import {
+  batchMessagePairsByByteLength,
+  conversationsWithHashes
+} from "~helpers/conversations"
 import {
   extractPreloadedConversations,
   getConversationMetadata
@@ -143,6 +146,12 @@ async function extractAndLogConversation() {
     const _conversationsWithHashes = conversationsWithHashes(conversationTurns)
     console.log(`Extracted Conversations W Hashes: `, _conversationsWithHashes)
 
+    const batchedMessages = batchMessagePairsByByteLength(
+      _conversationsWithHashes
+    )
+
+    console.log("Batched Messages:", batchedMessages)
+
     // Send to backend API
     if (
       userId &&
@@ -150,8 +159,10 @@ async function extractAndLogConversation() {
       _conversationsWithHashes &&
       _conversationsWithHashes.length > 0
     ) {
-      console.log("Sending data to backend...")
-      await sendSmartSync(userId, sessionId, _conversationsWithHashes)
+      for (const batch of batchedMessages) {
+        console.log("Sending data to backend...")
+        await sendSmartSync(userId, sessionId, batch)
+      }
     }
 
     return conversationTurns
