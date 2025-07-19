@@ -7,6 +7,7 @@ import { CHATGPT_PAGE_SELECTOR_PATH } from "~constant/page-extractor"
 
 import "./style.css"
 
+import { injectContext } from "~helpers/api"
 import { useSegments } from "~hooks/useSegments"
 import { extractAxiosResponseData, formatRawString } from "~utils"
 
@@ -121,12 +122,8 @@ function IndexPopup() {
     if (!sessionId) return
     const selections = getSelectionsPayload()
     try {
-      const res = await axios.post(
-        `http://localhost:4350/api/context/inject/${sessionId}`,
-        { selections },
-        { headers: { "Content-Type": "application/json" } }
-      )
-      const data = extractAxiosResponseData(res.data, "success")
+      const res = await injectContext(selections, sessionId)
+      const data = extractAxiosResponseData(res, "success")
         ?.data as unknown as {
         prompt: string
         estimated_token_count: number
@@ -343,7 +340,7 @@ function IndexPopup() {
             pointerEvents: "none"
           }}>
           <button
-            className="bg-black text-white px-8 py-3 text-lg font-semibold shadow-md cursor-pointer disabled:grayscale-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-black text-white px-8 py-3 text-lg font-semibold shadow-md cursor-pointer disabled:grayscale-0 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
             style={{
               borderRadius: 0,
               pointerEvents: "auto",

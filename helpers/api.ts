@@ -1,5 +1,12 @@
 import axios from "axios"
 
+export const $axios = axios.create({
+  baseURL: "http://localhost:4350/api",
+  headers: {
+    "Content-Type": "application/json"
+  }
+})
+
 interface SmartSyncPayload {
   userId: string
   platform_session_id: string
@@ -30,18 +37,25 @@ export async function sendSmartSync(
 
     console.log("Sending smart-sync request:", payload)
 
-    const response = await axios.post(
-      "http://localhost:4350/api/context/smart-sync",
-      payload,
-      {
-        headers: {
-          "Content-Type": "application/json"
-        }
+    const response = await $axios.post("/context/smart-sync", payload, {
+      headers: {
+        "Content-Type": "application/json"
       }
-    )
+    })
 
     console.log("Smart-sync response:", response.data)
   } catch (error) {
     console.error("Failed to send smart-sync request:", error)
   }
+}
+
+export async function injectContext(
+  selections: Array<{
+    segment_id: string
+    thread_ids?: string[]
+  }>,
+  sessionId: string
+) {
+  const res = await $axios.post(`/context/inject/${sessionId}`, { selections })
+  return res.data
 }
