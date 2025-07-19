@@ -340,7 +340,7 @@ function IndexPopup() {
             pointerEvents: "none"
           }}>
           <button
-            className="bg-black text-white px-8 py-3 text-lg font-semibold shadow-md cursor-pointer disabled:grayscale-0 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
+            className="bg-black text-white px-8 py-3 text-lg font-semibold shadow-md cursor-pointer disabled:grayscale disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
             style={{
               borderRadius: 0,
               pointerEvents: "auto",

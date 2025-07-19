@@ -6,7 +6,8 @@
   "author": "Plasmo Corp. <foss@plasmo.com>",
   "scripts": {
     "dev": "plasmo dev --verbose",
-    "build": "plasmo build",
+    "build:dev": "plasmo build",
+    "build:staging": "plasmo build --tag=staging --zip",
     "package": "plasmo package"
   },
   "dependencies": {

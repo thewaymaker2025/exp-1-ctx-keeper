@@ -1,7 +1,10 @@
 import axios from "axios"
 
 export const $axios = axios.create({
-  baseURL: "http://localhost:4350/api",
+  baseURL:
+    process.env.NODE_ENV === "development"
+      ? "http://localhost:4350/api"
+      : process.env.PLASMO_PUBLIC_API_URL + "/api",
   headers: {
     "Content-Type": "application/json"
   }
@@ -57,5 +60,10 @@ export async function injectContext(
   sessionId: string
 ) {
   const res = await $axios.post(`/context/inject/${sessionId}`, { selections })
+  return res.data
+}
+
+export async function getContextSegments(sessionId: string) {
+  const res = await $axios.get(`/context/segments/${sessionId}`)
   return res.data
 }

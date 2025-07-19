@@ -1,5 +1,7 @@
-import axios from "axios"
 import { useEffect, useState } from "react"
+
+import { getContextSegments } from "~helpers/api"
+import { extractAxiosResponseData } from "~utils"
 
 interface Thread {
   id: string
@@ -47,10 +49,7 @@ interface UseSegmentsState {
   metadata: SegmentsResponse["data"]["metadata"] | null
 }
 
-export function useSegments(
-  sessionId: string | null,
-  baseUrl: string = "http://localhost:4350/api"
-) {
+export function useSegments(sessionId: string | null) {
   const [state, setState] = useState<UseSegmentsState>({
     segments: [],
     loading: false,
@@ -62,15 +61,15 @@ export function useSegments(
     setState((prev) => ({ ...prev, loading: true, error: null }))
 
     try {
-      const response = await axios.get<SegmentsResponse>(
-        `${baseUrl}/context/segments/${sessionId}?include_threads=true`
-      )
+      const response = await getContextSegments(sessionId)
+      const data = extractAxiosResponseData(response, "success")
+        ?.data as unknown as SegmentsResponse["data"]
 
       setState({
-        segments: response.data.data.segments,
+        segments: data.segments,
         loading: false,
         error: null,
-        metadata: response.data.data.metadata
+        metadata: data.metadata
       })
     } catch (error) {
       setState((prev) => ({
@@ -99,7 +98,7 @@ export function useSegments(
         metadata: null
       })
     }
-  }, [sessionId, baseUrl])
+  }, [sessionId])
 
   return {
     ...state,
