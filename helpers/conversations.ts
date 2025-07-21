@@ -8,7 +8,8 @@ export function conversationsWithHashes(
 ) {
   return props.map((item) => ({
     ...item,
-    final_hash: md5(item.user + item.assistant)
+    final_hash: md5(item.user + item.assistant),
+    query_hash: md5(item.user)
   }))
 }
 

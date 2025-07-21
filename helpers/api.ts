@@ -40,15 +40,15 @@ export async function sendSmartSync(
 
     console.log("Sending smart-sync request:", payload)
 
-    const response = await $axios.post("/context/smart-sync", payload, {
+    const response = await $axios.post("/context/sync-pairs", payload, {
       headers: {
         "Content-Type": "application/json"
       }
     })
 
-    console.log("Smart-sync response:", response.data)
+    console.log("Sync Pairs response:", response.data)
   } catch (error) {
-    console.error("Failed to send smart-sync request:", error)
+    console.error("Failed to send sync pairs request:", error)
   }
 }
 
