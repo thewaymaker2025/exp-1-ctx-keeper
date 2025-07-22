@@ -38,8 +38,6 @@ export async function sendSmartSync(
       messages: conversationsWithHashes
     }
 
-    console.log("Sending smart-sync request:", payload)
-
     const response = await $axios.post("/context/sync-pairs", payload, {
       headers: {
         "Content-Type": "application/json"
@@ -67,5 +65,18 @@ export async function getContextSegments(sessionId: string) {
   const res = await $axios.get(
     `/context/segments/${sessionId}?include_threads=true`
   )
+  return res.data
+}
+
+export async function performFastReinjectionCheck(data: {
+  query: string
+  userId: string
+  sessionId: string
+}) {
+  const { query, userId, sessionId } = data
+  const res = await $axios.post(`/context/reinjection/${sessionId}`, {
+    query,
+    userId
+  })
   return res.data
 }

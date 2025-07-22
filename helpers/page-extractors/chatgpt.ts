@@ -1,6 +1,7 @@
 import retry from "async-retry"
 
 import { CHATGPT_PAGE_SELECTOR_PATH } from "~constant/page-extractor"
+import { getElementByXPath } from "~utils"
 
 /**
  * Wait for the conversation container to be ready
@@ -8,7 +9,7 @@ import { CHATGPT_PAGE_SELECTOR_PATH } from "~constant/page-extractor"
 async function waitForConversationContainer(): Promise<Element> {
   return await retry(
     async () => {
-      const container = document.querySelector(
+      const container = getElementByXPath(
         CHATGPT_PAGE_SELECTOR_PATH.conversation_container
       )
 
@@ -65,8 +66,6 @@ export async function extractPreloadedConversations(): Promise<
 
     const turns = getAllConversationTurns()
     const conversation = []
-
-    console.log(`📄 Processing ${turns.length} conversation turns...`)
 
     for (const turn of turns) {
       const userMessage = turn.querySelector(

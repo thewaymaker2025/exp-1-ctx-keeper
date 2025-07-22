@@ -1,6 +1,6 @@
 export const CHATGPT_PAGE_SELECTOR_PATH = {
   // Main conversation container
-  conversation_container: `div.\\@thread-xl\\/thread\\:pt-header-height.flex.flex-col.text-sm.pb-25`,
+  conversation_container: `//*[@id="thread"]/div/div[1]/div/div/div[2]`,
 
   // All conversation articles (both user and assistant messages)
   all_messages: `article[data-testid*="conversation-turn"]`,
@@ -22,5 +22,6 @@ export const CHATGPT_PAGE_SELECTOR_PATH = {
     // Action buttons within assistant message containers
     action_buttons: `article[data-testid*="conversation-turn"] .agent-turn .mx-\\[var\\(--mini-thread-content-inset\\)\\]`
   },
-  prompt_text_selector: `#prompt-textarea > p`
+  prompt_text_selector: `#prompt-textarea > p`,
+  prompt_input_selector: `#prompt-textarea.ProseMirror[contenteditable="true"]`
 }

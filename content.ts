@@ -1,20 +1,19 @@
 import type { PlasmoCSConfig } from "plasmo"
-import { generate } from "short-uuid"
 
-import { Storage } from "@plasmohq/storage"
-
-import { sendSmartSync } from "~helpers/api"
+import { performFastReinjectionCheck } from "~helpers/api"
 import {
-  batchMessagePairsByByteLength,
-  conversationsWithHashes
-} from "~helpers/conversations"
+  extractAndLogConversation,
+  monitorMessageSending
+} from "~helpers/chatgpt.helper"
+import { getChatPlatform, monitorProseMirrorInput } from "~helpers/page.helper"
+import type { ReinjectionResponse } from "~types/index.types"
 import {
-  extractPreloadedConversations,
-  getConversationMetadata
-} from "~helpers/page-extractors/chatgpt"
-import { copyAndPaste, formatRawString } from "~utils"
-
-const storage = new Storage()
+  copyAndPaste,
+  extractAxiosResponseData,
+  formatRawString,
+  getOrCreateUserId,
+  getSessionId
+} from "~utils"
 
 export const config: PlasmoCSConfig = {
   matches: ["https://chatgpt.com/c/*", "https://chatgpt.com/g/*"],
@@ -39,7 +38,7 @@ if (typeof chrome !== "undefined") {
             textarea.focus()
             textarea.value = ""
 
-            closePopup()
+            // closePopup()
 
             setTimeout(async () => {
               await copyAndPaste(formatted, textarea as HTMLElement)
@@ -61,114 +60,30 @@ function closePopup() {
   })
 }
 
-// Generate or retrieve user ID
-async function getOrCreateUserId(): Promise<string> {
-  const existingUserId = await storage.get("ctx_keeper_user_id")
+async function handleMessageSending(query: string) {
+  const platform = getChatPlatform(location.href)
+  // const allBatchedMessages = await extractAndLogConversation(false)
+  // const lastBatch = allBatchedMessages[allBatchedMessages.length - 1]
+  // const lastBatchMessage = lastBatch[lastBatch.length - 1]
 
-  if (existingUserId) {
-    console.log("Retrieved existing user ID:", existingUserId)
-    return existingUserId
-  }
-
-  const newUserId = generate()
-  await storage.set("ctx_keeper_user_id", newUserId)
-  console.log("Generated new user ID:", newUserId)
-  return newUserId
-}
-
-function getSessionId(): string | null {
-  // Handle regular chat URLs: /c/uuid
-  const chatMatch = location.href.match(
-    /\/c\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
-  )
-  if (chatMatch) {
-    return chatMatch[1]
-  }
-
-  // Handle GPT URLs: /g/g-xxxxx-xxxx
-  const gptMatch = location.href.match(/\/g\/(g-.+?)(?:\/|$)/)
-  if (gptMatch) {
-    return gptMatch[1]
-  }
-
-  return null
-}
-
-function isValidChatSessionUrl(): boolean {
-  const url = location.href
-
-  // Check for regular chat session with UUID
-  const chatRegex =
-    /\/c\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  if (chatRegex.test(url)) return true
-
-  // Check for GPT session
-  const gptRegex = /\/g\/g-.+/i
-  if (gptRegex.test(url)) return true
-
-  return false
-}
-
-async function extractAndLogConversation() {
   try {
-    // Always get and store user ID and session ID, regardless of URL validity
     const userId = await getOrCreateUserId()
-    const sessionId = getSessionId()
+    const sessionId = getSessionId(platform as any)
+    const res = await performFastReinjectionCheck({
+      userId,
+      sessionId,
+      query
+    })
 
-    console.log("Current URL:", location.href)
-    console.log("User ID:", userId)
-    console.log("Session ID:", sessionId)
-    console.log("Is valid chat URL:", isValidChatSessionUrl())
+    const data = extractAxiosResponseData(res, "success")
+      ?.data as unknown as ReinjectionResponse
 
-    // Always store these basic values
-    await storage.set("ctx_keeper_user_id", userId)
-    await storage.set("ctx_keeper_session_id", sessionId)
-    await storage.set("ctx_keeper_chat_session_url", location.href)
-
-    if (!isValidChatSessionUrl()) {
-      console.log(
-        "⏭️ Skipping conversation extraction - not a valid chat session URL with UUID:",
-        location.href
-      )
-
-      return []
-    }
-
-    console.log("Extracting preloaded conversations from:", location.href)
-
-    const metadata = getConversationMetadata()
-    console.log("Conversation metadata:", metadata)
-
-    // Extract preloaded conversations
-    const conversationTurns = await extractPreloadedConversations()
-    console.log("Extracted Preloaded Conversations:", conversationTurns)
-
-    const _conversationsWithHashes = conversationsWithHashes(conversationTurns)
-    console.log(`Extracted Conversations W Hashes: `, _conversationsWithHashes)
-
-    const batchedMessages = batchMessagePairsByByteLength(
-      _conversationsWithHashes
+    console.log({ data })
+  } catch (err: any) {
+    console.log(
+      `Error occurred while performing fast reinjection check: ${err.message}`,
+      err
     )
-
-    console.log("Batched Messages:", batchedMessages)
-
-    // Send to backend API
-    if (
-      userId &&
-      sessionId &&
-      _conversationsWithHashes &&
-      _conversationsWithHashes.length > 0
-    ) {
-      for (const batch of batchedMessages) {
-        console.log("Sending data to backend...")
-        await sendSmartSync(userId, sessionId, batch)
-      }
-    }
-
-    return conversationTurns
-  } catch (error) {
-    console.error("Failed to extract preloaded conversations:", error)
-    return []
   }
 }
 
@@ -177,7 +92,7 @@ function scheduleExtraction() {
   if (extractionTimeout) {
     clearTimeout(extractionTimeout)
   }
-  extractionTimeout = setTimeout(extractAndLogConversation, 1000) // Wait 1 second after changes stop
+  extractionTimeout = setTimeout(() => extractAndLogConversation(), 1000) // Wait 1 second after changes stop
 }
 
 // Monitor URL changes for navigation between chat sessions
@@ -241,8 +156,14 @@ window.addEventListener("load", async () => {
 
   // Set up monitoring for navigation between chat sessions
   monitorUrlChanges()
-  monitorHistoryChanges()
+  monitorProseMirrorInput(async (query: string) => {
+    await handleMessageSending(query)
+  }, "chatgpt")
 
   // Initial extraction of preloaded conversations
   scheduleExtraction()
+})
+
+window.addEventListener("submit", (e) => {
+  console.log("Something got submitted")
 })
