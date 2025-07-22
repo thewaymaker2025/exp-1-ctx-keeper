@@ -38,7 +38,7 @@ if (typeof chrome !== "undefined") {
             textarea.focus()
             textarea.value = ""
 
-            // closePopup()
+            closePopup()
 
             setTimeout(async () => {
               await copyAndPaste(formatted, textarea as HTMLElement)
